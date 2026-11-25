@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Color Correct</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <!-- 시작 화면 -->
+    <section id="screen-start" class="screen active">
+      <h1 class="logo">Color <span>Correct</span></h1>
+      <p class="lead">제시된 색을 팔레트에서 찾아 맞혀 보세요.</p>
+      <ul class="rules">
+        <li>총 <b>5라운드</b>로 진행돼요.</li>
+        <li>라운드마다 <b>3번</b> 시도할 수 있고, 가장 정확한 시도가 그 라운드 점수가 돼요.</li>
+        <li>5라운드 평균 정확도로 <b>S ~ F 등급</b>을 받아요.</li>
+      </ul>
+      <fieldset class="modes">
+        <legend>모드 선택</legend>
+        <label class="mode">
+          <input type="radio" name="mode" value="see" checked>
+          <span><b>보면서 맞추기</b><small>목표 색이 계속 보여요</small></span>
+        </label>
+        <label class="mode">
+          <input type="radio" name="mode" value="memory">
+          <span><b>기억해서 맞추기</b><small>목표 색이 3초 뒤 사라져요</small></span>
+        </label>
+      </fieldset>
+      <button id="btn-start" class="btn primary big">게임 시작</button>
+      <p id="best-record" class="best"></p>
+    </section>
+
+    <!-- 게임 화면 -->
+    <section id="screen-game" class="screen">
+      <header class="hud">
+        <div class="hud-item"><span class="hud-label">라운드</span><span id="hud-round" class="hud-value">1 / 5</span></div>
+        <div class="hud-item"><span class="hud-label">시도</span><span id="hud-tries" class="dots"></span></div>
+        <div class="hud-item"><span class="hud-label">평균 정확도</span><span id="hud-avg" class="hud-value">-</span></div>
+      </header>
+
+      <div class="swatches">
+        <figure class="swatch-wrap">
+          <div id="target-swatch" class="swatch">
+            <div id="target-cover" class="cover"><span id="cover-text">?</span></div>
+          </div>
+          <figcaption>목표 색 <code id="target-hex" class="hex"></code></figcaption>
+        </figure>
+        <figure class="swatch-wrap">
+          <div id="pick-swatch" class="swatch"></div>
+          <figcaption>내 선택 <code id="pick-hex" class="hex"></code></figcaption>
+        </figure>
+      </div>
+
+      <div class="picker" id="picker">
+        <canvas id="sv-canvas" class="sv" tabindex="0" aria-label="채도와 밝기 선택 (방향키로 조절)"></canvas>
+        <canvas id="hue-canvas" class="hue" tabindex="0" aria-label="색조 선택 (방향키로 조절)"></canvas>
+      </div>
+
+      <div class="actions">
+        <button id="btn-submit" class="btn primary">이 색으로 제출</button>
+        <button id="btn-next" class="btn" hidden>다음 라운드 →</button>
+        <button id="btn-confirm" class="btn ghost" hidden>이 점수로 확정</button>
+      </div>
+
+      <ol id="attempts" class="attempts"></ol>
+    </section>
+
+    <!-- 결과 화면 -->
+    <section id="screen-result" class="screen">
+      <p class="result-label">최종 등급</p>
+      <div id="grade" class="grade">S</div>
+      <p id="grade-title" class="grade-title"></p>
+      <p class="result-score">평균 정확도 <b id="final-avg">0%</b></p>
+      <p id="new-record" class="new-record" hidden>🎉 최고 기록 갱신!</p>
+      <table class="summary">
+        <thead><tr><th>라운드</th><th>목표</th><th>최고 선택</th><th>정확도</th></tr></thead>
+        <tbody id="summary-body"></tbody>
+      </table>
+      <div class="grade-table">
+        <span>S ≥ 95</span><span>A ≥ 90</span><span>B ≥ 80</span><span>C ≥ 70</span><span>D ≥ 60</span><span>F &lt; 60</span>
+      </div>
+      <button id="btn-restart" class="btn primary big">다시 하기</button>
+    </section>
+  </main>
+
+  <script src="color.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
