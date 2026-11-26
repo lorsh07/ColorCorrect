@@ -4,7 +4,7 @@
   const { hsvToRgb, rgbToHex, rgbToLab, deltaE2000, accuracyFromDeltaE } = window.ColorMath;
 
   const TOTAL_ROUNDS = 5;
-  const MAX_TRIES = 3;
+  const MAX_TRIES = 1;
   const MEMORY_SECONDS = 3;
   const PERFECT = 99; // 이 이상이면 남은 시도 없이 라운드 종료
   const BEST_KEY = 'colorcorrect.best';
