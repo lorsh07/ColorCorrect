@@ -10,13 +10,18 @@
   const BEST_KEY = 'colorcorrect.best';
 
   const GRADES = [
-    { min: 95, grade: 'S', title: '색채의 신! 거의 완벽한 눈이에요.' },
+    { min: 95, grade: 'S', title: '거의 완벽한 눈이에요.' },
     { min: 90, grade: 'A', title: '아주 예리한 색감각이에요.' },
     { min: 80, grade: 'B', title: '좋은 눈을 가졌어요.' },
-    { min: 70, grade: 'C', title: '괜찮아요, 조금만 더!' },
+    { min: 70, grade: 'C', title: '괜찮아요, 조금만 더.' },
     { min: 60, grade: 'D', title: '색 감각을 더 키워 볼까요?' },
-    { min: -1, grade: 'F', title: '다시 도전해 보세요!' },
+    { min: -1, grade: 'F', title: '다시 도전해 보세요.' },
   ];
+
+  const MODE_DESC = {
+    see: '목표 색이 계속 보여요.',
+    memory: `목표 색이 ${MEMORY_SECONDS}초 동안만 보이고 가려져요.`,
+  };
 
   const $ = (id) => document.getElementById(id);
   const el = {
@@ -30,6 +35,8 @@
     attempts: $('attempts'),
     grade: $('grade'), gradeTitle: $('grade-title'), finalAvg: $('final-avg'),
     newRecord: $('new-record'), summaryBody: $('summary-body'),
+    progress: $('progress'), navStatus: $('nav-status'), modeDesc: $('mode-desc'),
+    ringFill: $('ring-fill'), gradeScale: $('grade-scale'),
   };
 
   const state = {
@@ -72,7 +79,8 @@
 
   function showScreen(name) {
     Object.entries(el.screens).forEach(([k, s]) => s.classList.toggle('active', k === name));
-    if (name === 'game') requestAnimationFrame(resizeCanvases);
+    if (name !== 'game') el.navStatus.textContent = '';
+    window.scrollTo({ top: 0 });
   }
 
   /* ---------- 색상 팔레트 (HSV 피커) ---------- */
@@ -92,6 +100,7 @@
   function drawPicker() {
     const { h, s, v } = state.pick;
     const dpr = window.devicePixelRatio || 1;
+    const current = rgbToHex(hsvToRgb(h, s, v));
 
     // 채도(가로) × 밝기(세로) 사각형
     const W = el.sv.width, H = el.sv.height;
@@ -107,36 +116,36 @@
     black.addColorStop(1, '#000');
     svCtx.fillStyle = black;
     svCtx.fillRect(0, 0, W, H);
-    drawRing(svCtx, s * W, (1 - v) * H, 8 * dpr, dpr);
+    drawKnob(svCtx, s * W, (1 - v) * H, 11 * dpr, current, dpr);
 
-    // 색조 슬라이더
+    // 색조 슬라이더 (둥근 막대: 양 끝에 손잡이 반지름만큼 여백)
     const HW = el.hue.width, HH = el.hue.height;
-    const grad = hueCtx.createLinearGradient(0, 0, HW, 0);
+    const pad = HH / 2;
+    const grad = hueCtx.createLinearGradient(pad, 0, HW - pad, 0);
     for (let i = 0; i <= 12; i++) grad.addColorStop(i / 12, rgbToHex(hsvToRgb(i * 30, 1, 1)));
     hueCtx.fillStyle = grad;
     hueCtx.fillRect(0, 0, HW, HH);
-    const x = (h / 360) * HW;
-    hueCtx.lineWidth = 3 * dpr;
-    hueCtx.strokeStyle = '#fff';
-    hueCtx.strokeRect(x - 4 * dpr, 1.5 * dpr, 8 * dpr, HH - 3 * dpr);
-    hueCtx.lineWidth = 1 * dpr;
-    hueCtx.strokeStyle = 'rgba(0,0,0,.6)';
-    hueCtx.strokeRect(x - 5.5 * dpr, 0.5 * dpr, 11 * dpr, HH - 1 * dpr);
+    const x = pad + (h / 360) * (HW - 2 * pad);
+    drawKnob(hueCtx, x, HH / 2, HH / 2 - 3 * dpr, rgbToHex(hsvToRgb(h, 1, 1)), dpr);
 
     updatePickPreview();
   }
 
-  function drawRing(ctx, x, y, r, dpr) {
+  // 흰 테두리 + 그림자가 있는 동그란 손잡이
+  function drawKnob(ctx, x, y, r, fill, dpr) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,.35)';
+    ctx.shadowBlur = 6 * dpr;
+    ctx.shadowOffsetY = 1 * dpr;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.lineWidth = 3 * dpr;
-    ctx.strokeStyle = '#fff';
-    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.restore();
     ctx.beginPath();
-    ctx.arc(x, y, r + 2 * dpr, 0, Math.PI * 2);
-    ctx.lineWidth = 1 * dpr;
-    ctx.strokeStyle = 'rgba(0,0,0,.6)';
-    ctx.stroke();
+    ctx.arc(x, y, r - 3 * dpr, 0, Math.PI * 2);
+    ctx.fillStyle = fill;
+    ctx.fill();
   }
 
   function updatePickPreview() {
@@ -150,8 +159,7 @@
 
   function bindDrag(canvas, onMove) {
     const handle = (e) => {
-      const r = canvas.getBoundingClientRect();
-      onMove(clamp01((e.clientX - r.left) / r.width), clamp01((e.clientY - r.top) / r.height));
+      onMove(e, canvas.getBoundingClientRect());
       drawPicker();
     };
     canvas.addEventListener('pointerdown', (e) => {
@@ -164,8 +172,14 @@
     });
   }
 
-  bindDrag(el.sv, (x, y) => { state.pick.s = x; state.pick.v = 1 - y; });
-  bindDrag(el.hue, (x) => { state.pick.h = Math.min(359.9, x * 360); });
+  bindDrag(el.sv, (e, r) => {
+    state.pick.s = clamp01((e.clientX - r.left) / r.width);
+    state.pick.v = 1 - clamp01((e.clientY - r.top) / r.height);
+  });
+  bindDrag(el.hue, (e, r) => {
+    const pad = r.height / 2;
+    state.pick.h = Math.min(359.9, clamp01((e.clientX - r.left - pad) / (r.width - 2 * pad)) * 360);
+  });
 
   // 키보드로도 조절 (Shift = 크게)
   el.sv.addEventListener('keydown', (e) => {
@@ -188,9 +202,10 @@
     drawPicker();
   });
 
-  window.addEventListener('resize', () => {
+  // 화면 크기나 레이아웃이 바뀌면 팔레트를 다시 그림 (회전, 창 크기 변경, 반응형 전환)
+  new ResizeObserver(() => {
     if (el.screens.game.classList.contains('active')) resizeCanvases();
-  });
+  }).observe(el.sv);
 
   /* ---------- 게임 흐름 ---------- */
   function startGame() {
@@ -250,6 +265,16 @@
     el.hudRound.textContent = `${state.round} / ${TOTAL_ROUNDS}`;
     const done = state.results.map((r) => r.best.acc);
     el.hudAvg.textContent = done.length ? fmt(average(done)) : '-';
+    el.navStatus.textContent = `라운드 ${state.round} / ${TOTAL_ROUNDS}`;
+
+    // 라운드 진행 막대: 끝난 라운드는 검정, 진행 중인 라운드는 회색
+    el.progress.innerHTML = '';
+    for (let i = 1; i <= TOTAL_ROUNDS; i++) {
+      const seg = document.createElement('span');
+      if (i <= done.length) seg.className = 'done';
+      else if (i === state.round) seg.className = 'current';
+      el.progress.appendChild(seg);
+    }
   }
 
   const average = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
@@ -291,29 +316,25 @@
 
   function renderAttempt(a, n, isLast) {
     const li = document.createElement('li');
-    li.className = 'attempt ' + tier(a.acc);
-    const hintText = isLast ? '' : (a.hints.length ? a.hints.join(' · ') : '거의 다 왔어요!');
+    li.className = 'attempt';
+    const hintText = isLast ? '' : (a.hints.length ? a.hints.join(' · ') : '거의 다 왔어요.');
     li.innerHTML = `
-      <span class="attempt-n">${n}차</span>
+      ${MAX_TRIES > 1 ? `<span class="attempt-n">${n}차</span>` : ''}
       <span class="mini" style="background:${a.hex}"></span>
-      <span class="attempt-body">
-        <span class="attempt-acc">${fmt(a.acc)}</span>
-        <span class="attempt-msg">${message(a.acc)}</span>
-        ${hintText ? `<span class="attempt-hint">${hintText}</span>` : ''}
-      </span>`;
+      <div class="attempt-body">
+        <div class="attempt-top">
+          <span class="attempt-acc">${fmt(a.acc)}</span>
+          <span class="attempt-msg">${message(a.acc)} · ΔE ${a.dE.toFixed(1)}</span>
+        </div>
+        <div class="bar"><span style="width:${a.acc}%"></span></div>
+        ${hintText ? `<p class="attempt-hint">${hintText}</p>` : ''}
+      </div>`;
     el.attempts.appendChild(li);
   }
 
-  function tier(acc) {
-    if (acc >= 95) return 't-s';
-    if (acc >= 85) return 't-a';
-    if (acc >= 70) return 't-b';
-    return 't-c';
-  }
-
   function message(acc) {
-    if (acc >= PERFECT) return '완벽해요!';
-    if (acc >= 95) return '거의 똑같아요!';
+    if (acc >= PERFECT) return '완벽해요';
+    if (acc >= 95) return '거의 똑같아요';
     if (acc >= 90) return '아주 가까워요';
     if (acc >= 80) return '가까워요';
     if (acc >= 65) return '조금 멀어요';
@@ -330,17 +351,20 @@
     el.submit.hidden = true;
     el.confirm.hidden = true;
     el.next.hidden = false;
-    el.next.textContent = state.round >= TOTAL_ROUNDS ? '결과 보기 →' : '다음 라운드 →';
+    el.next.textContent = state.round >= TOTAL_ROUNDS ? '결과 보기' : '다음 라운드';
     el.screens.game.classList.add('locked');
 
     // 최고 시도를 팔레트와 미리보기에 표시 (화면 크기가 바뀌어 다시 그려져도 유지됨)
     state.pick = { h: best.h, s: best.s, v: best.v };
     drawPicker();
 
-    const li = document.createElement('li');
-    li.className = 'round-score';
-    li.innerHTML = `라운드 ${state.round} 점수 <b>${fmt(best.acc)}</b>`;
-    el.attempts.appendChild(li);
+    // 시도가 여러 번일 때만 라운드 점수를 따로 표시 (1번이면 시도 카드와 같음)
+    if (MAX_TRIES > 1) {
+      const li = document.createElement('li');
+      li.className = 'round-score';
+      li.innerHTML = `라운드 ${state.round} 점수 <b>${fmt(best.acc)}</b>`;
+      el.attempts.appendChild(li);
+    }
     updateHud();
     el.next.focus();
   }
@@ -354,17 +378,31 @@
     const avg = average(state.results.map((r) => r.best.acc));
     const g = gradeFor(avg);
     el.grade.textContent = g.grade;
-    el.grade.className = 'grade g-' + g.grade.toLowerCase();
     el.gradeTitle.textContent = g.title;
     el.finalAvg.textContent = fmt(avg);
 
+    // 등급 기준표: 받은 등급만 검정으로 강조
+    el.gradeScale.innerHTML = GRADES.map((x) => `
+      <span class="grade-chip${x.grade === g.grade ? ' current' : ''}">
+        <b>${x.grade}</b>${x.min < 0 ? `${GRADES[GRADES.length - 2].min} 미만` : `${x.min} 이상`}
+      </span>`).join('');
+
     el.summaryBody.innerHTML = state.results.map((r, i) => `
-      <tr>
-        <td>${i + 1}</td>
-        <td><span class="mini" style="background:${r.target.hex}"></span><code>${r.target.hex}</code></td>
-        <td><span class="mini" style="background:${r.best.hex}"></span><code>${r.best.hex}</code></td>
-        <td class="${tier(r.best.acc)}">${fmt(r.best.acc)}</td>
-      </tr>`).join('');
+      <li class="summary-row">
+        <span class="summary-round">${i + 1}</span>
+        <span class="pair" aria-hidden="true">
+          <span class="mini" style="background:${r.target.hex}"></span>
+          <span class="mini" style="background:${r.best.hex}"></span>
+        </span>
+        <span class="summary-codes">
+          <span>목표 <code>${r.target.hex}</code></span>
+          <span>선택 <code>${r.best.hex}</code></span>
+        </span>
+        <span class="summary-acc">
+          <b>${fmt(r.best.acc)}</b>
+          <span class="bar"><span style="width:${r.best.acc}%"></span></span>
+        </span>
+      </li>`).join('');
 
     const best = loadBest();
     const key = state.mode;
@@ -372,6 +410,14 @@
     if (isNew) { best[key] = avg; saveBest(best); }
     el.newRecord.hidden = !isNew;
     showScreen('result');
+
+    // 평균 정확도만큼 링 채우기
+    const C = 2 * Math.PI * 54;
+    el.ringFill.style.transition = 'none';
+    el.ringFill.style.strokeDashoffset = C;
+    el.ringFill.getBoundingClientRect();
+    el.ringFill.style.transition = '';
+    el.ringFill.style.strokeDashoffset = C * (1 - avg / 100);
   }
 
   function renderBestRecord() {
@@ -384,6 +430,9 @@
 
   /* ---------- 이벤트 ---------- */
   $('btn-start').addEventListener('click', startGame);
+  document.querySelectorAll('input[name="mode"]').forEach((r) => {
+    r.addEventListener('change', () => { el.modeDesc.textContent = MODE_DESC[r.value]; });
+  });
   el.submit.addEventListener('click', submit);
   el.confirm.addEventListener('click', () => { if (!state.roundOver && state.tries.length) endRound(); });
   el.next.addEventListener('click', next);
@@ -396,5 +445,6 @@
     else next();
   });
 
+  el.modeDesc.textContent = MODE_DESC[document.querySelector('input[name="mode"]:checked').value];
   renderBestRecord();
 })();
