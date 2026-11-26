@@ -22,7 +22,7 @@
   const el = {
     screens: { start: $('screen-start'), game: $('screen-game'), result: $('screen-result') },
     bestRecord: $('best-record'),
-    hudRound: $('hud-round'), hudTries: $('hud-tries'), hudAvg: $('hud-avg'),
+    hudRound: $('hud-round'), hudAvg: $('hud-avg'),
     targetSwatch: $('target-swatch'), targetCover: $('target-cover'), coverText: $('cover-text'),
     targetHex: $('target-hex'), pickSwatch: $('pick-swatch'), pickHex: $('pick-hex'),
     sv: $('sv-canvas'), hue: $('hue-canvas'),
@@ -248,13 +248,6 @@
 
   function updateHud() {
     el.hudRound.textContent = `${state.round} / ${TOTAL_ROUNDS}`;
-    el.hudTries.innerHTML = '';
-    for (let i = 0; i < MAX_TRIES; i++) {
-      const d = document.createElement('span');
-      d.className = 'dot' + (i < MAX_TRIES - state.tries.length ? '' : ' used');
-      el.hudTries.appendChild(d);
-    }
-    el.hudTries.setAttribute('aria-label', `${MAX_TRIES - state.tries.length}번 남음`);
     const done = state.results.map((r) => r.best.acc);
     el.hudAvg.textContent = done.length ? fmt(average(done)) : '-';
   }
